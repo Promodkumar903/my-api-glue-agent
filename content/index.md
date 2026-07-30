@@ -16,6 +16,15 @@ sections:
         secondary_action:
           text: "Learn More"
           url: "#services"
+
+  - id: chat
+    block: markdown
+    content:
+        title: "🤖 Chat with AI Glue Agent"
+        text: "Ask about your data gaps or request a scan."
+        body: |
+          <iframe src="https://Pramod123.pythonanywhere.com/chat" width="100%" height="600px" style="border:0; border-radius:16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);"></iframe>
+
   - id: pricing
     block: pricing
     content:
@@ -35,6 +44,7 @@ sections:
             price: { monthly: 69 }
             price_suffix: "/month"
             price_note: "Billed yearly"
+
   - id: contact
     block: contact-info
     content:
