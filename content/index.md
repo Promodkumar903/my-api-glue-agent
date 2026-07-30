@@ -1,6 +1,6 @@
 https://github.com/Promodkumar903/my-api-glue-agent/new/main/content/index.md
 ---
-title: AI Glue Agent — Find and Fix Data Gaps Between Salesforce and Jira
+title: AI Glue Agent — Find and Fix Data Gaps Between Salesforce and  Jira
 date: 2026-07-30
 summary: "AI Glue Agent seamlessly connects Salesforce and Jira to identify and resolve data gaps."
 type: landing
