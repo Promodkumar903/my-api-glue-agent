@@ -1,0 +1,11 @@
+[general]
+name = "My Bot"
+language = "hindi"
+
+[server]
+port = 8080
+host = "localhost"
+
+[model]
+name = "gpt-3.5"
+temperature = 0.7
