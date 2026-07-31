@@ -1,0 +1,12 @@
+baseURL = "/"
+languageCode = "en-us"
+title = "AI Glue Agent"
+
+[params]
+  description = "Find and fix data gaps between Salesforce and Jira"
+
+[module]
+  [[module.mounts]]
+    source = "."
+    target = "."
+    includeFiles = ["chat.html"]
