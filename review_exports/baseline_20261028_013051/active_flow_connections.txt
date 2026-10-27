@@ -1,0 +1,266 @@
+AI GLUE ACTIVE FLOW CONNECTION REPORT
+Generated: 2026-10-28T01:35:09
+Root: C:\Users\Administrator\AI_GLUE_AGENT_FULL_PROJECT\ai_glue_agent_v1
+
+===== app.py =====
+app.py:11: from api.bookings import bookings_bp
+app.py:14: from api.payments import payments_bp
+app.py:18: from api.service_delivery import service_delivery_bp
+app.py:21: from api.payment_evidence import payment_evidence_bp
+app.py:36: "PAYMENT_WEBHOOK_SECRET",
+app.py:37: os.environ.get("PAYMENT_WEBHOOK_SECRET", ""),
+app.py:63: app.register_blueprint(health_bp, url_prefix="/api/v1")
+app.py:64: app.register_blueprint(requests_bp, url_prefix="/api/v1")
+app.py:65: app.register_blueprint(crm_bp, url_prefix="/api/v1")
+app.py:66: app.register_blueprint(matching_bp, url_prefix="/api/v1")
+app.py:67: app.register_blueprint(admin_providers_bp, url_prefix="/api/v1")
+app.py:68: app.register_blueprint(provider_portal_bp, url_prefix="/api/v1")
+app.py:69: app.register_blueprint(quotes_bp, url_prefix="/api/v1")
+app.py:70: app.register_blueprint(payments_bp, url_prefix="/api/v1")
+app.py:71: app.register_blueprint(financial_ops_bp, url_prefix="/api/v1")
+app.py:72: app.register_blueprint(bookings_bp, url_prefix="/api/v1")
+app.py:73: app.register_blueprint(service_delivery_bp, url_prefix="/api/v1")
+app.py:74: app.register_blueprint(operations_bp, url_prefix="/api/v1")
+app.py:75: app.register_blueprint(payment_evidence_bp, url_prefix="/api/v1")
+app.py:76: app.register_blueprint(auth_bp, url_prefix="/api/v1")
+app.py:77: app.register_blueprint(web_pages_bp)
+app.py:78: app.register_blueprint(corporate_bp, url_prefix="/api/v1")
+app.py:108: # Payment webhooks validate their own signatures.
+app.py:109: if path == "/api/v1/payments/webhooks/generic":
+
+===== api\requests.py =====
+api\requests.py:8: from services.office_workflow_dispatch import dispatch_office_request
+api\requests.py:9: from services.operations_handlers import handle_audit_event
+api\requests.py:10: from services.office_workflow_engine import create_office_workflow
+api\requests.py:109: decision = dispatch_office_request(
+api\requests.py:147: office_workflow = create_office_workflow(
+api\requests.py:185: office_routing["status"] = "WORKFLOW_NOT_CONNECTED"
+api\requests.py:187: # Use the actual saved public request ID for the audit event.
+api\requests.py:194: audit_payload = {
+api\requests.py:208: handle_audit_event(audit_payload)
+api\requests.py:209: office_routing["audit_status"] = "RECORDED"
+api\requests.py:211: # Request creation already succeeded. Report audit failure
+api\requests.py:214: "Failed to record office dispatch audit event "
+api\requests.py:218: office_routing["audit_status"] = "FAILED"
+api\requests.py:220: office_routing["audit_status"] = "REQUEST_ID_UNAVAILABLE"
+
+===== api\operations.py =====
+api\operations.py:16: JOB_TYPES = {"REMINDER", "NOTIFICATION", "RETRY", "AUDIT_EVENT"}
+api\operations.py:20: def _audit(connection, event_type, job_key, details):
+api\operations.py:23: INSERT INTO operations_audit
+api\operations.py:82: _audit(
+api\operations.py:139: _audit(
+api\operations.py:225: _audit(
+api\operations.py:327: _audit(
+
+===== api\quotes.py =====
+api\quotes.py:73: def create_quote(public_id):
+api\quotes.py:226: "message": "Quote issued. Booking and payment are not confirmed.",
+api\quotes.py:240: if decision not in {"APPROVED", "REJECTED"}:
+api\quotes.py:303: if decision == "APPROVED":
+api\quotes.py:307: SET status = 'AWAITING_BOOKING',
+api\quotes.py:331: "Quote decision recorded. Booking is not confirmed and "
+api\quotes.py:332: "payment has not been received."
+
+===== api\bookings.py =====
+api\bookings.py:1: """Secure customer booking requests based on approved quotes and evidence."""
+api\bookings.py:12: bookings_bp = Blueprint("bookings", __name__)
+api\bookings.py:56: @bookings_bp.post("/requests/<public_id>/booking")
+api\bookings.py:57: def create_booking_request(public_id):
+api\bookings.py:76: # Serialize booking attempts before reading/reserving capacity.
+api\bookings.py:105: if customer_request["status"] != "AWAITING_BOOKING":
+api\bookings.py:107: "error": "REQUEST_NOT_READY_FOR_BOOKING",
+api\bookings.py:130: if quote["status"] != "APPROVED":
+api\bookings.py:131: return jsonify({"error": "QUOTE_NOT_APPROVED"}), 409
+api\bookings.py:140: "SELECT id, status FROM bookings WHERE request_id = ?",
+api\bookings.py:146: "error": "BOOKING_ALREADY_EXISTS",
+api\bookings.py:147: "booking_id": existing["id"],
+api\bookings.py:213: FROM bookings
+api\bookings.py:239: INSERT INTO bookings (
+api\bookings.py:254: booking_id = cursor.lastrowid
+api\bookings.py:259: "BOOKING_REQUESTED",
+api\bookings.py:261: "booking_id": booking_id,
+api\bookings.py:266: "booking_status": "PENDING_PROVIDER_CONFIRMATION",
+api\bookings.py:271: current_app.logger.exception("Booking request creation failed")
+api\bookings.py:272: return jsonify({"error": "BOOKING_REQUEST_CREATION_FAILED"}), 500
+api\bookings.py:275: "booking": {
+api\bookings.py:276: "booking_id": booking_id,
+api\bookings.py:285: "Booking request created. Provider confirmation is pending; "
+api\bookings.py:286: "payment has not been received."
+
+===== api\service_delivery.py =====
+api\service_delivery.py:1: """Admin-mediated service delivery workflow and customer completion decision."""
+api\service_delivery.py:11: service_delivery_bp = Blueprint("service_delivery", __name__)
+api\service_delivery.py:52: def _find_booking(con, booking_id):
+api\service_delivery.py:54: """SELECT b.id, b.request_id, b.status AS booking_status,
+api\service_delivery.py:57: FROM bookings b JOIN service_requests r ON r.id=b.request_id
+api\service_delivery.py:58: WHERE b.id=?""", (booking_id,)
+api\service_delivery.py:62: @service_delivery_bp.patch("/admin/bookings/<int:booking_id>/status")
+api\service_delivery.py:63: def update_booking_status(booking_id):
+api\service_delivery.py:72: return jsonify({"error": "INVALID_BOOKING_STATUS"}), 400
+api\service_delivery.py:76: booking = _find_booking(con, booking_id)
+api\service_delivery.py:77: if booking is None:
+api\service_delivery.py:78: return jsonify({"error": "BOOKING_NOT_FOUND"}), 404
+api\service_delivery.py:79: current = booking["booking_status"]
+api\service_delivery.py:88: "UPDATE bookings SET status=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND status=?",
+api\service_delivery.py:89: (target, booking_id, current),
+api\service_delivery.py:92: con.execute("UPDATE service_requests SET status='BOOKED', updated_at=CURRENT_TIMESTAMP WHERE id=?", (booking["request_id"],))
+api\service_delivery.py:94: con.execute("UPDATE service_requests SET status='IN_PROGRESS', updated_at=CURRENT_TIMESTAMP WHERE id=?", (booking["request_id"],))
+api\service_delivery.py:96: con.execute("UPDATE service_requests SET status='CANCELLED', updated_at=CURRENT_TIMESTAMP WHERE id=?", (booking["request_id"],))
+api\service_delivery.py:97: _event(con, booking["request_id"], "BOOKING_STATUS_CHANGED", "ADMIN", {"booking_id": booking_id, "from": current, "to": target})
+api\service_delivery.py:101: @service_delivery_bp.post("/admin/bookings/<int:booking_id>/delivery-proofs")
+api\service_delivery.py:102: def submit_delivery_proof(booking_id):
+api\service_delivery.py:122: booking = _find_booking(con, booking_id)
+api\service_delivery.py:123: if booking is None:
+api\service_delivery.py:124: return jsonify({"error": "BOOKING_NOT_FOUND"}), 404
+api\service_delivery.py:125: if booking["booking_status"] != "IN_PROGRESS":
+api\service_delivery.py:126: return jsonify({"error": "BOOKING_NOT_IN_PROGRESS", "status": booking["booking_status"]}), 409
+api\service_delivery.py:128: "INSERT INTO delivery_proofs (booking_id,proof_type,storage_reference,submitted_by) VALUES (?,?,?,'ADMIN_MEDIATED_PROVIDER')",
+api\service_delivery.py:129: (booking_id, proof_type, storage_reference.strip()),
+api\service_delivery.py:132: con.execute("UPDATE service_requests SET status='AWAITING_CUSTOMER_CONFIRMATION', updated_at=CURRENT_TIMESTAMP WHERE id=?", (booking["request_id"],))
+api\service_delivery.py:133: _event(con, booking["request_id"], "DELIVERY_PROOF_SUBMITTED", "ADMIN", {"booking_id": booking_id, "proof_id": proof_id, "proof_type": proof_type, "storage_reference": storage_reference.strip(), "notes": notes.strip()})
+api\service_delivery.py:134: return jsonify({"proof_id": proof_id, "booking_id": booking_id, "status": "AWAITING_CUSTOMER_CONFIRMATION", "message": "Proof reference recorded; customer approval and payment are not implied."}), 201
+api\service_delivery.py:137: @service_delivery_bp.get("/requests/<public_id>/delivery-proofs")
+api\service_delivery.py:138: def list_delivery_proofs(public_id):
+api\service_delivery.py:146: """SELECT dp.id AS proof_id, dp.booking_id, dp.proof_type,
+api\service_delivery.py:149: FROM delivery_proofs dp JOIN bookings b ON b.id=dp.booking_id
+api\service_delivery.py:152: return jsonify({"delivery_proofs": [dict(row) for row in rows]}), 200
+api\service_delivery.py:155: @service_delivery_bp.post("/requests/<public_id>/delivery-proofs/<int:proof_id>/decision")
+api\service_delivery.py:156: def decide_delivery_proof(public_id, proof_id):
+api\service_delivery.py:162: if decision not in {"APPROVED", "DISPUTED"}:
+api\service_delivery.py:175: """SELECT dp.id, dp.booking_id, dp.customer_decision, b.status AS booking_status
+api\service_delivery.py:176: FROM delivery_proofs dp JOIN bookings b ON b.id=dp.booking_id
+api\service_delivery.py:180: return jsonify({"error": "DELIVERY_PROOF_NOT_FOUND"}), 404
+api\service_delivery.py:181: if proof["booking_status"] != "IN_PROGRESS":
+api\service_delivery.py:182: return jsonify({"error": "BOOKING_NOT_AWAITING_CUSTOMER_REVIEW", "status": proof["booking_status"]}), 409
+api\service_delivery.py:186: "UPDATE delivery_proofs SET customer_decision=?, customer_decision_at=?, customer_note=? WHERE id=? AND customer_decision IS NULL",
+api\service_delivery.py:191: if decision == "APPROVED":
+api\service_delivery.py:192: con.execute("UPDATE bookings SET status='COMPLETED', updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='IN_PROGRESS'", (proof["booking_id"],))
+api\service_delivery.py:196: _event(con, customer["id"], "DELIVERY_PROOF_" + decision, "CUSTOMER", {"booking_id": proof["booking_id"], "proof_id": proof_id, "decision": decision, "note": note.strip()})
+api\service_delivery.py:197: return jsonify({"proof_id": proof_id, "decision": decision, "decided_at": decided_at, "request_status": "COMPLETED" if decision == "APPROVED" else "DISPUTED", "message": "Completion decision recorded. This does not create or confirm a payment."}), 200
+
+===== api\payments.py =====
+api\payments.py:1: """Gateway-neutral payment intent and signed webhook processing.
+api\payments.py:19: payments_bp = Blueprint("payments", __name__)
+api\payments.py:37: @payments_bp.post("/requests/<public_id>/payments")
+api\payments.py:38: def create_payment_intent(public_id):
+api\payments.py:39: """Create a local pending payment record; amount always comes from the approved quote."""
+api\payments.py:57: existing = con.execute("SELECT * FROM payment_records WHERE idempotency_key=?", (idempotency_key,)).fetchone()
+api\payments.py:61: return jsonify({"payment": _payment_json(existing), "idempotent_replay": True}), 200
+api\payments.py:65: b.id AS booking_id, b.status AS booking_status
+api\payments.py:66: FROM quotes q JOIN bookings b ON b.quote_id=q.id AND b.request_id=q.request_id
+api\payments.py:71: return jsonify({"error": "APPROVED_BOOKING_NOT_FOUND"}), 409
+api\payments.py:72: if row["quote_status"] != "APPROVED":
+api\payments.py:73: return jsonify({"error": "QUOTE_NOT_APPROVED"}), 409
+api\payments.py:74: if row["booking_status"] not in {"CONFIRMED", "IN_PROGRESS", "COMPLETED"}:
+api\payments.py:75: return jsonify({"error": "BOOKING_NOT_CONFIRMED", "booking_status": row["booking_status"]}), 409
+api\payments.py:80: """INSERT INTO payment_records
+api\payments.py:81: (request_id, booking_id, gateway_name, amount_minor, currency, status, idempotency_key)
+api\payments.py:83: (customer["id"], row["booking_id"], row["amount_minor"], row["currency"], idempotency_key),
+api\payments.py:85: payment = con.execute("SELECT * FROM payment_records WHERE id=?", (cur.lastrowid,)).fetchone()
+api\payments.py:86: _event(con, customer["id"], "PAYMENT_INTENT_CREATED", "CUSTOMER", {
+api\payments.py:87: "payment_id": cur.lastrowid, "booking_id": row["booking_id"],
+api\payments.py:91: "payment": _payment_json(payment),
+api\payments.py:92: "message": "Pending payment record created; no charge has been initiated.",
+api\payments.py:97: def _payment_json(row):
+api\payments.py:99: "payment_id": row["id"], "request_id": row["request_id"], "booking_id": row["booking_id"],
+api\payments.py:106: @payments_bp.post("/payments/webhooks/generic")
+api\payments.py:107: def generic_payment_webhook():
+api\payments.py:109: secret = current_app.config.get("PAYMENT_WEBHOOK_SECRET", "")
+api\payments.py:111: return jsonify({"error": "PAYMENT_WEBHOOK_NOT_CONFIGURED"}), 503
+api\payments.py:113: supplied = request.headers.get("X-Payment-Signature", "").strip()
+api\payments.py:123: required = {"event_id", "payment_id", "transaction_id", "amount_minor", "currency", "status"}
+api\payments.py:129: if type(payload["payment_id"]) is not int or payload["payment_id"] < 1:
+api\payments.py:130: return jsonify({"error": "INVALID_PAYMENT_ID"}), 400
+api\payments.py:138: return jsonify({"error": "INVALID_PAYMENT_STATUS"}), 400
+api\payments.py:142: previous = con.execute("SELECT * FROM payment_webhook_events WHERE gateway_event_id=?", (event_id,)).fetchone()
+api\payments.py:146: payment = con.execute("SELECT * FROM payment_records WHERE id=?", (previous["payment_id"],)).fetchone()
+api\payments.py:147: return jsonify({"status": "DUPLICATE_IGNORED", "payment": _payment_json(payment)}), 200
+api\payments.py:149: payment = con.execute("SELECT * FROM payment_records WHERE id=?", (payload["payment_id"],)).fetchone()
+api\payments.py:150: if payment is None:
+api\payments.py:151: return jsonify({"error": "PAYMENT_NOT_FOUND"}), 404
+api\payments.py:152: if payment["amount_minor"] != payload["amount_minor"] or payment["currency"] != currency:
+api\payments.py:153: return jsonify({"error": "PAYMENT_AMOUNT_OR_CURRENCY_MISMATCH"}), 409
+api\payments.py:154: if payment["gateway_transaction_id"] not in (None, transaction_id):
+api\payments.py:156: old = payment["status"]
+api\payments.py:163: return jsonify({"error": "INVALID_PAYMENT_STATE_TRANSITION", "current_status": old, "requested_status": status}), 409
+api\payments.py:166: "UPDATE payment_records SET status=?, gateway_transaction_id=?, verified_at=?, gateway_event_id=?, webhook_payload_sha256=? WHERE id=? AND status=?",
+api\payments.py:167: (status, transaction_id, verified_at, event_id, digest, payment["id"], old),
+api\payments.py:170: "INSERT INTO payment_webhook_events (gateway_event_id,payment_id,event_status,payload_sha256) VALUES (?,?,?,?)",
+api\payments.py:171: (event_id, payment["id"], status, digest),
+api\payments.py:173: _event(con, payment["request_id"], "PAYMENT_" + status, "PAYMENT_GATEWAY", {
+api\payments.py:177: updated = con.execute("SELECT * FROM payment_records WHERE id=?", (payment["id"],)).fetchone()
+api\payments.py:178: return jsonify({"status": "PROCESSED", "payment": _payment_json(updated)}), 200
+
+===== api\financial_ops.py =====
+api\financial_ops.py:1: """Block 9 refund request and settlement reconciliation foundation.
+api\financial_ops.py:55: return {"refund_id": row["id"], "payment_id": row["payment_id"], "amount_minor": row["amount_minor"],
+api\financial_ops.py:60: @financial_ops_bp.post("/requests/<public_id>/payments/<int:payment_id>/refund-requests")
+api\financial_ops.py:61: def create_refund_request(public_id, payment_id):
+api\financial_ops.py:91: or previous["payment_id"] != payment_id
+api\financial_ops.py:102: payment = con.execute(
+api\financial_ops.py:103: "SELECT id, request_id, amount_minor, currency, status FROM payment_records WHERE id=? AND request_id=?",
+api\financial_ops.py:104: (payment_id, customer["id"]),
+api\financial_ops.py:106: if payment is None:
+api\financial_ops.py:107: return jsonify({"error": "PAYMENT_NOT_FOUND"}), 404
+api\financial_ops.py:108: if payment["status"] != "VERIFIED":
+api\financial_ops.py:109: return jsonify({"error": "PAYMENT_NOT_REFUNDABLE", "payment_status": payment["status"]}), 409
+api\financial_ops.py:111: "SELECT COALESCE(SUM(amount_minor),0) AS total FROM refund_requests WHERE payment_id=? AND status IN ('REQUESTED','APPROVED','SUBMITTED','REFUNDED')",
+api\financial_ops.py:112: (payment_id,),
+api\financial_ops.py:114: if amount > payment["amount_minor"] - prior:
+api\financial_ops.py:115: return jsonify({"error": "REFUND_AMOUNT_EXCEEDS_REMAINING", "remaining_minor": max(0, payment["amount_minor"] - prior)}), 409
+api\financial_ops.py:117: "INSERT INTO refund_requests (payment_id,request_id,amount_minor,currency,idempotency_key,reason) VALUES (?,?,?,?,?,?)",
+api\financial_ops.py:121: _event(con, customer["id"], "REFUND_REQUESTED", "CUSTOMER", {"refund_id": cur.lastrowid, "payment_id": payment_id, "amount_minor": amount, "currency": payment["currency"]})
+api\financial_ops.py:135: if target not in {"APPROVED", "REJECTED", "SUBMITTED", "FAILED"}:
+api\financial_ops.py:137: transitions = {"REQUESTED": {"APPROVED", "REJECTED"}, "APPROVED": {"SUBMITTED", "REJECTED"}, "SUBMITTED": {"FAILED"}, "REJECTED": set(), "FAILED": set(), "REFUNDED": set()}
+api\financial_ops.py:151: @financial_ops_bp.get("/admin/settlements/preview")
+api\financial_ops.py:152: def settlement_preview():
+api\financial_ops.py:161: """SELECT p.id AS payment_id, p.amount_minor, p.currency, p.status,
+api\financial_ops.py:163: WHERE rr.payment_id=p.id AND rr.status='REFUNDED'),0) AS refunded_minor
+api\financial_ops.py:164: FROM payment_records p
+api\financial_ops.py:165: JOIN bookings b ON b.id=p.booking_id
+api\financial_ops.py:182: entries.append({"payment_id": row["payment_id"], "currency": currency, "gross_verified_minor": gross, "refunds_confirmed_minor": refunded, "net_minor": net})
+api\financial_ops.py:183: return jsonify({"provider_code": provider_code, "mode": "PREVIEW_ONLY_NO_PAYOUT", "totals_by_currency": totals, "entries": entries, "message": "Preview only; no settlement ledger posting or bank payout is initiated."}), 200
+api\financial_ops.py:192: payment_counts = {r["status"]: r["count"] for r in con.execute("SELECT status,COUNT(*) AS count FROM payment_records GROUP BY status")}
+api\financial_ops.py:195: """SELECT COUNT(*) FROM payment_records p JOIN bookings b ON b.id=p.booking_id
+api\financial_ops.py:200: """SELECT COUNT(*) FROM payment_records p LEFT JOIN bookings b ON b.id=p.booking_id
+api\financial_ops.py:203: return jsonify({"mode": "READ_ONLY_RECONCILIATION", "payment_counts": payment_counts, "refund_counts": refund_counts,
+api\financial_ops.py:204: "quote_mismatch_count": mismatch_count, "verified_payment_booking_mismatch_count": unmatched_verified}
+
+===== services\request_intake.py =====
+services\request_intake.py:4: from repositories.request_repository import create_request
+services\request_intake.py:13: result, repository_error = create_request(data, account_id=account_id)
+services\request_intake.py:28: dispatch_office_request,
+services\request_intake.py:33: decision = dispatch_office_request(
+
+===== services\office_workflow_engine.py =====
+services\office_workflow_engine.py:3: Creates durable workflow records for the eight approved office services.
+services\office_workflow_engine.py:80: "Approvals, Audit & Exception Handling": {
+services\office_workflow_engine.py:85: "authorized_approver",
+services\office_workflow_engine.py:87: "next_action": "PROVIDE_APPROVAL_TARGET_AND_APPROVER",
+services\office_workflow_engine.py:115: def create_office_workflow(
+services\office_workflow_engine.py:167: status = "AWAITING_DETAILS"
+services\office_workflow_engine.py:233: def get_office_workflow(workflow_public_id: str) -> dict[str, Any] | None
+
+===== services\office_workflow_dispatch.py =====
+services\office_workflow_dispatch.py:29: "Approvals, Audit & Exception Handling": "APPROVALS",
+services\office_workflow_dispatch.py:33: def dispatch_office_request(
+services\office_workflow_dispatch.py:99: if result.get("execution_completed") is True:
+
+===== services\operations_handlers.py =====
+services\operations_handlers.py:2: """Validated, idempotent audit-event handler for operations jobs."""
+services\operations_handlers.py:9: def handle_audit_event(payload):
+services\operations_handlers.py:10: """Persist one audit event without overwriting existing audit history."""
+services\operations_handlers.py:12: raise ValueError("AUDIT_EVENT_PAYLOAD_MUST_BE_OBJECT")
+services\operations_handlers.py:22: raise ValueError("INVALID_AUDIT_EVENT_FIELDS")
+services\operations_handlers.py:32: raise ValueError("AUDIT_EVENT_DETAILS_MUST_BE_OBJECT")
+services\operations_handlers.py:48: INSERT OR IGNORE INTO operations_audit
+services\operations_handlers.py:64: FROM operations_audit
+services\operations_handlers.py:71: raise RuntimeError("AUDIT_EVENT_PERSISTENCE_FAILED")
+services\operations_handlers.py:83: raise ValueError("AUDIT_EVENT_KEY_CONFLICT")
+
+===== operations_worker.py =====
+operations_worker.py:14: from services.operations_handlers import handle_audit_event
+operations_worker.py:23: handlers = {"AUDIT_EVENT": handle_audit_event}
+
+===== operations_worker_runner.py
